@@ -249,7 +249,6 @@ static void gst_kaldinnet2onlinedecoder_class_init(
     Gstkaldinnet2onlinedecoderClass *klass)
 {
 
-  
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
 
@@ -260,7 +259,6 @@ static void gst_kaldinnet2onlinedecoder_class_init(
   gobject_class->set_property = gst_kaldinnet2onlinedecoder_set_property;
   gobject_class->get_property = gst_kaldinnet2onlinedecoder_get_property;
   gobject_class->finalize = gst_kaldinnet2onlinedecoder_finalize;
-
   gstelement_class->change_state = gst_kaldinnet2onlinedecoder_change_state;
 
   g_object_class_install_property(
@@ -293,7 +291,7 @@ static void gst_kaldinnet2onlinedecoder_class_init(
   g_object_class_install_property(
       gobject_class, PROP_FST_PRT,
       g_param_spec_pointer("fst-ptr", "Decoding FST Pointer", "The pointer to the already loaded HCLG FST",
-                          (GParamFlags)G_PARAM_READWRITE));
+                           (GParamFlags)G_PARAM_READWRITE));
   g_object_class_install_property(
       gobject_class,
       PROP_WORD_SYMS,
@@ -446,6 +444,146 @@ static void gst_kaldinnet2onlinedecoder_class_init(
           DEFAULT_MIN_WORDS_FOR_IVECTOR,
           (GParamFlags)G_PARAM_READWRITE));
 
+
+  bool tmp_bool;
+  int32 tmp_int;
+  uint32 tmp_uint;
+  float tmp_float;
+  double tmp_double;
+  std::string tmp_string;
+  SimpleOptionsGst *simple_options = new SimpleOptionsGst();
+
+  OnlineEndpointConfig *endpoint_config = new OnlineEndpointConfig();
+  OnlineNnet2FeaturePipelineConfig *feature_config = new OnlineNnet2FeaturePipelineConfig();
+  OnlineNnet2DecodingConfig *nnet2_decoding_config = new OnlineNnet2DecodingConfig();
+  OnlineNnet2DecodingThreadedConfig *nnet2_decoding_threaded_config = new OnlineNnet2DecodingThreadedConfig();
+  nnet3::NnetSimpleLoopedComputationOptions *nnet3_decodable_opts = new nnet3::NnetSimpleLoopedComputationOptions();
+  LatticeFasterDecoderConfig *decoder_opts = new LatticeFasterDecoderConfig();
+  OnlineSilenceWeightingConfig *silence_weighting_config = new OnlineSilenceWeightingConfig();
+
+  endpoint_config->Register(simple_options);
+  feature_config->Register(simple_options);
+  silence_weighting_config->Register(simple_options);
+
+  // since the properties of the decoders overlap, they need to be set in the correct order
+  // we'll redo this if the use-threaded-decoder property is changed
+  if (DEFAULT_NNET_MODE == NNET2)
+  {
+    nnet3_decodable_opts->Register(simple_options);
+    decoder_opts->Register(simple_options);
+    if (DEFAULT_USE_THREADED_DECODER)
+    {
+      nnet2_decoding_config->Register(simple_options);
+      nnet2_decoding_threaded_config->Register(simple_options);
+    }
+    else
+    {
+      nnet2_decoding_threaded_config->Register(simple_options);
+      nnet2_decoding_config->Register(simple_options);
+    }
+  }
+  else
+  {
+    if (DEFAULT_USE_THREADED_DECODER)
+    {
+      nnet2_decoding_config->Register(simple_options);
+      nnet2_decoding_threaded_config->Register(simple_options);
+    }
+    else
+    {
+      nnet2_decoding_threaded_config->Register(simple_options);
+      nnet2_decoding_config->Register(simple_options);
+    }
+    nnet3_decodable_opts->Register(simple_options);
+    decoder_opts->Register(simple_options);
+  }
+
+  // init properties from various Kaldi Opts
+  std::set<std::string> seen_options;
+  std::vector<std::pair<std::string, SimpleOptions::OptionInfo>> option_info_list;
+  option_info_list = simple_options->GetOptionInfoList();
+  int32 i = 0;
+  for (std::vector<std::pair<std::string, SimpleOptions::OptionInfo>>::iterator dx =
+           option_info_list.begin();
+       dx != option_info_list.end(); dx++)
+  {
+    std::pair<std::string, SimpleOptions::OptionInfo> result = (*dx);
+    SimpleOptions::OptionInfo option_info = result.second;
+    std::string name = result.first;
+
+    // GetOptionInfoList returns duplicate options
+    if (seen_options.find(name) != seen_options.end())
+      continue;
+
+    seen_options.insert(name);
+
+    switch (option_info.type)
+    {
+    case SimpleOptions::kBool:
+      simple_options->GetOption(name, &tmp_bool);
+      g_object_class_install_property(
+          G_OBJECT_CLASS(klass),
+          PROP_LAST + i,
+          g_param_spec_boolean(name.c_str(), option_info.doc.c_str(),
+                               option_info.doc.c_str(), tmp_bool,
+                               (GParamFlags)G_PARAM_READWRITE));
+      break;
+    case SimpleOptions::kInt32:
+      simple_options->GetOption(name, &tmp_int);
+      g_object_class_install_property(
+          G_OBJECT_CLASS(klass),
+          PROP_LAST + i,
+          g_param_spec_int(name.c_str(), option_info.doc.c_str(),
+                           option_info.doc.c_str(),
+                           G_MININT,
+                           G_MAXINT, tmp_int,
+                           (GParamFlags)G_PARAM_READWRITE));
+      break;
+    case SimpleOptions::kUint32:
+      simple_options->GetOption(name, &tmp_uint);
+      g_object_class_install_property(
+          G_OBJECT_CLASS(klass),
+          PROP_LAST + i,
+          g_param_spec_uint(name.c_str(), option_info.doc.c_str(),
+                            option_info.doc.c_str(), 0,
+                            G_MAXUINT,
+                            tmp_uint, (GParamFlags)G_PARAM_READWRITE));
+      break;
+    case SimpleOptions::kFloat:
+      simple_options->GetOption(name, &tmp_float);
+      g_object_class_install_property(
+          G_OBJECT_CLASS(klass),
+          PROP_LAST + i,
+          g_param_spec_float(name.c_str(), option_info.doc.c_str(),
+                             option_info.doc.c_str(),
+                             -std::numeric_limits<float>::infinity(),
+                             std::numeric_limits<float>::infinity(), tmp_float,
+                             (GParamFlags)G_PARAM_READWRITE));
+      break;
+    case SimpleOptions::kDouble:
+      simple_options->GetOption(name, &tmp_double);
+      g_object_class_install_property(
+          G_OBJECT_CLASS(klass),
+          PROP_LAST + i,
+          g_param_spec_double(name.c_str(), option_info.doc.c_str(),
+                              option_info.doc.c_str(),
+                              -std::numeric_limits<double>::infinity(),
+                              -std::numeric_limits<double>::infinity(), tmp_double,
+                              (GParamFlags)G_PARAM_READWRITE));
+      break;
+    case SimpleOptions::kString:
+      simple_options->GetOption(name, &tmp_string);
+      g_object_class_install_property(
+          G_OBJECT_CLASS(klass),
+          PROP_LAST + i,
+          g_param_spec_string(name.c_str(), option_info.doc.c_str(),
+                              option_info.doc.c_str(), tmp_string.c_str(),
+                              (GParamFlags)G_PARAM_READWRITE));
+      break;
+    }
+    i += 1;
+  }
+
   gst_kaldinnet2onlinedecoder_signals[PARTIAL_RESULT_SIGNAL] = g_signal_new(
       "partial-result", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
       G_STRUCT_OFFSET(Gstkaldinnet2onlinedecoderClass, partial_result),
@@ -487,12 +625,6 @@ static void gst_kaldinnet2onlinedecoder_init(
 {
 
   GST_INFO_OBJECT(filter, "- - - gst_kaldinnet2onlinedecoder_init(..)");
-  bool tmp_bool;
-  int32 tmp_int;
-  uint32 tmp_uint;
-  float tmp_float;
-  double tmp_double;
-  std::string tmp_string;
 
   filter->trans_model = NULL;
   filter->am_nnet2 = NULL;
@@ -527,6 +659,22 @@ static void gst_kaldinnet2onlinedecoder_init(
   filter->do_phone_alignment = false;
   filter->num_phone_alignment = 1;
 
+  // will be set later
+  filter->feature_info = NULL;
+  filter->sample_rate = 0;
+  filter->decoding = false;
+  filter->lmwt_scale = DEFAULT_LMWT_SCALE;
+  filter->inverse_scale = FALSE;
+  filter->chunk_length_in_secs = DEFAULT_CHUNK_LENGTH_IN_SECS;
+
+  filter->lm_fst_name = g_strdup("");
+  filter->big_lm_const_arpa_name = g_strdup("");
+
+  filter->use_threaded_decoder = false;
+  filter->num_nbest = DEFAULT_NUM_NBEST;
+  filter->min_words_for_ivector = DEFAULT_MIN_WORDS_FOR_IVECTOR;
+
+  
   filter->simple_options = new SimpleOptionsGst();
 
   filter->endpoint_config = new OnlineEndpointConfig();
@@ -572,109 +720,6 @@ static void gst_kaldinnet2onlinedecoder_init(
     }
     filter->nnet3_decodable_opts->Register(filter->simple_options);
     filter->decoder_opts->Register(filter->simple_options);
-  }
-
-  // will be set later
-  filter->feature_info = NULL;
-  filter->sample_rate = 0;
-  filter->decoding = false;
-  filter->lmwt_scale = DEFAULT_LMWT_SCALE;
-  filter->inverse_scale = FALSE;
-  filter->chunk_length_in_secs = DEFAULT_CHUNK_LENGTH_IN_SECS;
-
-  filter->lm_fst_name = g_strdup("");
-  filter->big_lm_const_arpa_name = g_strdup("");
-
-  filter->use_threaded_decoder = false;
-  filter->num_nbest = DEFAULT_NUM_NBEST;
-  filter->min_words_for_ivector = DEFAULT_MIN_WORDS_FOR_IVECTOR;
-
-  // init properties from various Kaldi Opts
-  GstElementClass *klass = GST_ELEMENT_GET_CLASS(filter);
-
-  std::set<std::string> seen_options;
-  std::vector<std::pair<std::string, SimpleOptions::OptionInfo>> option_info_list;
-  option_info_list = filter->simple_options->GetOptionInfoList();
-  int32 i = 0;
-  for (std::vector<std::pair<std::string, SimpleOptions::OptionInfo>>::iterator dx =
-           option_info_list.begin();
-       dx != option_info_list.end(); dx++)
-  {
-    std::pair<std::string, SimpleOptions::OptionInfo> result = (*dx);
-    SimpleOptions::OptionInfo option_info = result.second;
-    std::string name = result.first;
-
-    // GetOptionInfoList returns duplicate options
-    if (seen_options.find(name) != seen_options.end())
-      continue;
-
-    seen_options.insert(name);
-
-    switch (option_info.type)
-    {
-    case SimpleOptions::kBool:
-      filter->simple_options->GetOption(name, &tmp_bool);
-      g_object_class_install_property(
-          G_OBJECT_CLASS(klass),
-          PROP_LAST + i,
-          g_param_spec_boolean(name.c_str(), option_info.doc.c_str(),
-                               option_info.doc.c_str(), tmp_bool,
-                               (GParamFlags)G_PARAM_READWRITE));
-      break;
-    case SimpleOptions::kInt32:
-      filter->simple_options->GetOption(name, &tmp_int);
-      g_object_class_install_property(
-          G_OBJECT_CLASS(klass),
-          PROP_LAST + i,
-          g_param_spec_int(name.c_str(), option_info.doc.c_str(),
-                           option_info.doc.c_str(),
-                           G_MININT,
-                           G_MAXINT, tmp_int,
-                           (GParamFlags)G_PARAM_READWRITE));
-      break;
-    case SimpleOptions::kUint32:
-      filter->simple_options->GetOption(name, &tmp_uint);
-      g_object_class_install_property(
-          G_OBJECT_CLASS(klass),
-          PROP_LAST + i,
-          g_param_spec_uint(name.c_str(), option_info.doc.c_str(),
-                            option_info.doc.c_str(), 0,
-                            G_MAXUINT,
-                            tmp_uint, (GParamFlags)G_PARAM_READWRITE));
-      break;
-    case SimpleOptions::kFloat:
-      filter->simple_options->GetOption(name, &tmp_float);
-      g_object_class_install_property(
-          G_OBJECT_CLASS(klass),
-          PROP_LAST + i,
-          g_param_spec_float(name.c_str(), option_info.doc.c_str(),
-                             option_info.doc.c_str(),
-                             -std::numeric_limits<float>::infinity(),
-                             std::numeric_limits<float>::infinity(), tmp_float,
-                             (GParamFlags)G_PARAM_READWRITE));
-      break;
-    case SimpleOptions::kDouble:
-      filter->simple_options->GetOption(name, &tmp_double);
-      g_object_class_install_property(
-          G_OBJECT_CLASS(klass),
-          PROP_LAST + i,
-          g_param_spec_double(name.c_str(), option_info.doc.c_str(),
-                              option_info.doc.c_str(),
-                              -std::numeric_limits<double>::infinity(),
-                              -std::numeric_limits<double>::infinity(), tmp_double,
-                              (GParamFlags)G_PARAM_READWRITE));
-      break;
-    case SimpleOptions::kString:
-      filter->simple_options->GetOption(name, &tmp_string);
-      g_object_class_install_property(
-          G_OBJECT_CLASS(klass),
-          PROP_LAST + i,
-          g_param_spec_string(name.c_str(), option_info.doc.c_str(),
-                              option_info.doc.c_str(), tmp_string.c_str(),
-                              (GParamFlags)G_PARAM_READWRITE));
-      break;
-    }
-    i += 1;
   }
 }
 
@@ -2156,7 +2201,7 @@ gst_kaldinnet2onlinedecoder_load_fst_ptr(Gstkaldinnet2onlinedecoder *filter,
     try
     {
       GST_DEBUG_OBJECT(filter, "Loading decoder graph pointer");
-      fst::Fst<fst::StdArc> *new_decode_fst = (fst::Fst<fst::StdArc>*)g_value_get_pointer(value);
+      fst::Fst<fst::StdArc> *new_decode_fst = (fst::Fst<fst::StdArc> *)g_value_get_pointer(value);
 
       // Delete objects if needed
       if (filter->decode_fst)
