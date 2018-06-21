@@ -1,3 +1,10 @@
+# Work in progress (not stable)
+
+Have started on optimizing the plugin to accept an already loaded FST model. 
+This will reduce the load time and you can have multiple decoders running sharing the same FST model (memory optimization). 
+
+Why? Because the FST model can become very big, and if you want mulitple decoders running it is easy run out of memory. 
+
 # WHAT IT IS
 
 
