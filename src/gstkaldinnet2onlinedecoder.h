@@ -99,7 +99,9 @@ struct _Gstkaldinnet2onlinedecoder {
   nnet2::AmNnet *am_nnet2;
   nnet3::AmNnetSimple *am_nnet3;
   nnet3::DecodableNnetSimpleLoopedInfo *decodable_info_nnet3;
+  bool own_decode_fst;
   fst::Fst<fst::StdArc> *decode_fst;
+  bool own_word_syms;
   fst::SymbolTable *word_syms;
   fst::SymbolTable *phone_syms;
   WordBoundaryInfo *word_boundary_info;

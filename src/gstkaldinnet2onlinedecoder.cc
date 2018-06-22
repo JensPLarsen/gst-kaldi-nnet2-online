@@ -88,7 +88,6 @@ enum
   PROP_NNET_MODE,
   PROP_SILENT,
   PROP_MODEL,
-  PROP_MODEL_PTR,
   PROP_FST,
   PROP_FST_PTR,
   PROP_WORD_SYMS,
@@ -207,6 +206,10 @@ static void gst_kaldinnet2onlinedecoder_load_word_syms(
     Gstkaldinnet2onlinedecoder *filter,
     const GValue *value);
 
+static void gst_kaldinnet2onlinedecoder_load_word_syms_ptr(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value);
+
 static void gst_kaldinnet2onlinedecoder_load_model(
     Gstkaldinnet2onlinedecoder *filter,
     const GValue *value);
@@ -310,15 +313,6 @@ static void gst_kaldinnet2onlinedecoder_class_init(Gstkaldinnet2onlinedecoderCla
           (GParamFlags)G_PARAM_READWRITE));
 
   g_object_class_install_property(
-      gobject_class,
-      PROP_MODEL_PTR,
-      g_param_spec_pointer(
-          "model-ptr",
-          "Acoustic model Pointer",
-          "The pointer to the already loaded acoustic model",
-          (GParamFlags)G_PARAM_READWRITE));
-
-  g_object_class_install_property(
       gobject_class, PROP_FST,
       g_param_spec_string(
           "fst",
@@ -343,6 +337,15 @@ static void gst_kaldinnet2onlinedecoder_class_init(Gstkaldinnet2onlinedecoderCla
           "Word symbols",
           "Name of word symbols file (typically words.txt)",
           DEFAULT_WORD_SYMS,
+          (GParamFlags)G_PARAM_READWRITE));
+
+  g_object_class_install_property(
+      gobject_class,
+      PROP_WORD_SYMS_PTR,
+      g_param_spec_pointer(
+          "word-syms-ptr",
+          "Word symbols Pointer",
+          "The pointer to the already loaded word symbols",
           (GParamFlags)G_PARAM_READWRITE));
 
   g_object_class_install_property(
@@ -718,8 +721,10 @@ static void gst_kaldinnet2onlinedecoder_class_init(Gstkaldinnet2onlinedecoderCla
       "Convert speech to text",
       "Tanel Alumae <tanel.alumae@phon.ioc.ee>");
 
-  gst_element_class_add_pad_template(gstelement_class,
-                                     gst_static_pad_template_get(&src_template));
+  gst_element_class_add_pad_template(
+      gstelement_class,
+      gst_static_pad_template_get(&src_template));
+      
   gst_element_class_add_pad_template(
       gstelement_class, gst_static_pad_template_get(&sink_template));
 }
@@ -851,10 +856,11 @@ void register_decoding_config(Gstkaldinnet2onlinedecoder *filter)
   }
 }
 
-static void gst_kaldinnet2onlinedecoder_set_property(GObject *object,
-                                                     guint prop_id,
-                                                     const GValue *value,
-                                                     GParamSpec *pspec)
+static void gst_kaldinnet2onlinedecoder_set_property(
+    GObject *object,
+    guint prop_id,
+    const GValue *value,
+    GParamSpec *pspec)
 {
 
   Gstkaldinnet2onlinedecoder *filter = GST_KALDINNET2ONLINEDECODER(object);
@@ -880,6 +886,9 @@ static void gst_kaldinnet2onlinedecoder_set_property(GObject *object,
     break;
   case PROP_WORD_SYMS:
     gst_kaldinnet2onlinedecoder_load_word_syms(filter, value);
+    break;
+  case PROP_WORD_SYMS_PTR:
+    gst_kaldinnet2onlinedecoder_load_word_syms_ptr(filter, value);
     break;
   case PROP_PHONE_SYMS:
     gst_kaldinnet2onlinedecoder_load_phone_syms(filter, value);
@@ -1038,12 +1047,18 @@ static void gst_kaldinnet2onlinedecoder_get_property(
     {
       decode_fst_ptr = filter->decode_fst;
     }
-
     g_value_set_pointer(value, decode_fst_ptr);
-
     break;
   case PROP_WORD_SYMS:
     g_value_set_string(value, filter->word_syms_filename);
+    break;
+  case PROP_WORD_SYMS_PTR:
+    gpointer word_syms_ptr;
+    if (filter->word_syms)
+    {
+      word_syms_ptr = filter->word_syms;
+    }
+    g_value_set_pointer(value, word_syms_ptr);
     break;
   case PROP_PHONE_SYMS:
     g_value_set_string(value, filter->phone_syms_filename);
@@ -2089,13 +2104,14 @@ static void gst_kaldinnet2onlinedecoder_load_word_syms(
         }
 
         // Delete old objects if needed
-        if (filter->word_syms)
+        if (filter->word_syms && filter->own_word_syms == true)
         {
           delete filter->word_syms;
         }
 
         // Replace the symbol table
         filter->word_syms = new_word_syms;
+        filter->own_word_syms = true;
 
         // Only change the parameter if it has worked correctly
         g_free(filter->word_syms_filename);
@@ -2112,6 +2128,47 @@ static void gst_kaldinnet2onlinedecoder_load_word_syms(
   else
   {
     GST_WARNING_OBJECT(filter, "Word symbols filename property must be a string. Ignoring it.");
+  }
+}
+
+static void gst_kaldinnet2onlinedecoder_load_word_syms_ptr(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value)
+{
+
+  if (G_VALUE_HOLDS_POINTER(value))
+  {
+    try
+    {
+      GST_DEBUG_OBJECT(filter, "Loading word symbols pointer");
+      fst::SymbolTable *new_word_syms = (fst::SymbolTable *)g_value_get_pointer(value);
+
+      //Checks if the SymbolTable is loaded
+      if (!new_word_syms)
+      {
+        throw std::runtime_error("Word symbol table failed to load from the provided pointer. Is the pointer valid?");
+      }
+
+      // Delete objects if needed
+      if (filter->word_syms && filter->own_word_syms == true)
+      {
+        delete filter->word_syms;
+      }
+
+      // Replace the decoding graph
+      filter->word_syms = new_word_syms;
+
+      //We have loaded the decoding graph from a pointer which is not owned by this kaldi element, we will treat it as a readonly resource.
+      filter->own_word_syms = false;
+    }
+    catch (std::runtime_error &e)
+    {
+      GST_WARNING_OBJECT(filter, "Error loading the Word symbols pointer");
+    }
+  }
+  else
+  {
+    GST_WARNING_OBJECT(filter, "Word symbols pointer property must be a pointer to a fst::SymbolTable. Ignoring it.");
   }
 }
 
@@ -2256,8 +2313,9 @@ static void gst_kaldinnet2onlinedecoder_load_model(
           // this object contains precomputed stuff that is used by all decodable
           // objects.  It takes a pointer to am_nnet because if it has iVectors it has
           // to modify the nnet to accept iVectors at intervals.
-          filter->decodable_info_nnet3 = new nnet3::DecodableNnetSimpleLoopedInfo(*(filter->nnet3_decodable_opts),
-                                                                                  filter->am_nnet3);
+          filter->decodable_info_nnet3 = new nnet3::DecodableNnetSimpleLoopedInfo(
+              *(filter->nnet3_decodable_opts),
+              filter->am_nnet3);
         }
 
         // Only change the parameter if it has worked correctly
@@ -2296,14 +2354,14 @@ static void gst_kaldinnet2onlinedecoder_load_fst(
         fst::Fst<fst::StdArc> *new_decode_fst = fst::ReadFstKaldiGeneric(str);
 
         // Delete objects if needed
-        if (filter->decode_fst)
+        if (filter->decode_fst && filter->own_decode_fst == true)
         {
           delete filter->decode_fst;
         }
 
         // Replace the decoding graph
         filter->decode_fst = new_decode_fst;
-
+        filter->own_decode_fst = true;
         // Only change the parameter if it has worked correctly
         g_free(filter->fst_rspecifier);
         filter->fst_rspecifier = g_strdup(str);
@@ -2333,14 +2391,23 @@ static void gst_kaldinnet2onlinedecoder_load_fst_ptr(
       GST_DEBUG_OBJECT(filter, "Loading decoder graph pointer");
       fst::Fst<fst::StdArc> *new_decode_fst = (fst::Fst<fst::StdArc> *)g_value_get_pointer(value);
 
+      //Checks if the decoder graph is loaded
+      if (!new_decode_fst)
+      {
+        throw std::runtime_error("Error loading the FST decoding graph pointer. Is the pointer valid?");
+      }
+
       // Delete objects if needed
-      if (filter->decode_fst)
+      if (filter->decode_fst && filter->own_decode_fst == true)
       {
         delete filter->decode_fst;
       }
 
       // Replace the decoding graph
       filter->decode_fst = new_decode_fst;
+
+      //We have loaded the decoding graph from a pointer which is not owned by this kaldi element, we will treat it as a readonly resource.
+      filter->own_decode_fst = false;
     }
     catch (std::runtime_error &e)
     {
@@ -2573,11 +2640,11 @@ static void gst_kaldinnet2onlinedecoder_finalize(GObject *object)
   {
     delete filter->am_nnet3;
   }
-  if (filter->decode_fst)
+  if (filter->decode_fst && filter->own_decode_fst == true)
   {
     delete filter->decode_fst;
   }
-  if (filter->word_syms)
+  if (filter->word_syms && filter->own_word_syms == true)
   {
     delete filter->word_syms;
   }
@@ -2644,12 +2711,12 @@ static gboolean kaldinnet2onlinedecoder_init(
  * a license and blacklists the module :S
  */
 GST_PLUGIN_DEFINE(
-  GST_VERSION_MAJOR, 
-  GST_VERSION_MINOR,
-  kaldinnet2onlinedecoder,
-  "kaldinnet2onlinedecoder",
-  kaldinnet2onlinedecoder_init,
-  VERSION, "unknown", 
-  "GStreamer",
-  "http://gstreamer.net/")
+    GST_VERSION_MAJOR,
+    GST_VERSION_MINOR,
+    kaldinnet2onlinedecoder,
+    "kaldinnet2onlinedecoder",
+    kaldinnet2onlinedecoder_init,
+    VERSION, "unknown",
+    "GStreamer",
+    "http://gstreamer.net/")
 } // namespace kaldi
