@@ -88,9 +88,11 @@ enum
   PROP_NNET_MODE,
   PROP_SILENT,
   PROP_MODEL,
+  PROP_MODEL_PTR,
   PROP_FST,
-  PROP_FST_PRT,
+  PROP_FST_PTR,
   PROP_WORD_SYMS,
+  PROP_WORD_SYMS_PTR,
   PROP_PHONE_SYMS,
   PROP_DO_PHONE_ALIGNMENT,
   PROP_DO_ENDPOINTING,
@@ -172,71 +174,88 @@ struct _FullFinalResult
  *
  */
 static GstStaticPadTemplate sink_template =
-    GST_STATIC_PAD_TEMPLATE("sink",
-                            GST_PAD_SINK,
-                            GST_PAD_ALWAYS,
-                            GST_STATIC_CAPS(
-                                "audio/x-raw, "
-                                "format = (string) S16LE, "
-                                "channels = (int) 1, "
-                                "rate = (int) [ 1, MAX ]"));
+    GST_STATIC_PAD_TEMPLATE(
+        "sink",
+        GST_PAD_SINK,
+        GST_PAD_ALWAYS,
+        GST_STATIC_CAPS(
+            "audio/x-raw, "
+            "format = (string) S16LE, "
+            "channels = (int) 1, "
+            "rate = (int) [ 1, MAX ]"));
 
 static GstStaticPadTemplate src_template =
-    GST_STATIC_PAD_TEMPLATE("src",
-                            GST_PAD_SRC,
-                            GST_PAD_ALWAYS,
-                            GST_STATIC_CAPS("text/x-raw, format= { utf8 }"));
+    GST_STATIC_PAD_TEMPLATE(
+        "src",
+        GST_PAD_SRC,
+        GST_PAD_ALWAYS,
+        GST_STATIC_CAPS("text/x-raw, format= { utf8 }"));
 
 static guint gst_kaldinnet2onlinedecoder_signals[LAST_SIGNAL];
 
 #define gst_kaldinnet2onlinedecoder_parent_class parent_class
-G_DEFINE_TYPE(Gstkaldinnet2onlinedecoder, gst_kaldinnet2onlinedecoder,
-              GST_TYPE_ELEMENT);
+G_DEFINE_TYPE(
+    Gstkaldinnet2onlinedecoder,
+    gst_kaldinnet2onlinedecoder,
+    GST_TYPE_ELEMENT);
 
-static void gst_kaldinnet2onlinedecoder_load_phone_syms(Gstkaldinnet2onlinedecoder *filter,
-                                                        const GValue *value);
+static void gst_kaldinnet2onlinedecoder_load_phone_syms(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value);
 
-static void gst_kaldinnet2onlinedecoder_load_word_syms(Gstkaldinnet2onlinedecoder *filter,
-                                                       const GValue *value);
+static void gst_kaldinnet2onlinedecoder_load_word_syms(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value);
 
-static void gst_kaldinnet2onlinedecoder_load_model(Gstkaldinnet2onlinedecoder *filter,
-                                                   const GValue *value);
+static void gst_kaldinnet2onlinedecoder_load_model(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value);
 
-static void gst_kaldinnet2onlinedecoder_load_fst(Gstkaldinnet2onlinedecoder *filter,
-                                                 const GValue *value);
+static void gst_kaldinnet2onlinedecoder_load_fst(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value);
 
-static void gst_kaldinnet2onlinedecoder_load_fst_ptr(Gstkaldinnet2onlinedecoder *filter,
-                                                     const GValue *value);
+static void gst_kaldinnet2onlinedecoder_load_fst_ptr(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value);
 
-static void gst_kaldinnet2onlinedecoder_load_lm_fst(Gstkaldinnet2onlinedecoder *filter,
-                                                    const GValue *value);
+static void gst_kaldinnet2onlinedecoder_load_lm_fst(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value);
 
-static void gst_kaldinnet2onlinedecoder_load_big_lm(Gstkaldinnet2onlinedecoder *filter,
-                                                    const GValue *value);
+static void gst_kaldinnet2onlinedecoder_load_big_lm(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value);
 
-static void gst_kaldinnet2onlinedecoder_load_word_boundary_info(Gstkaldinnet2onlinedecoder *filter,
-                                                                const GValue *value);
+static void gst_kaldinnet2onlinedecoder_load_word_boundary_info(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value);
 
-static void gst_kaldinnet2onlinedecoder_set_property(GObject *object,
-                                                     guint prop_id,
-                                                     const GValue *value,
-                                                     GParamSpec *pspec);
+static void gst_kaldinnet2onlinedecoder_set_property(
+    GObject *object,
+    guint prop_id,
+    const GValue *value,
+    GParamSpec *pspec);
 
-static void gst_kaldinnet2onlinedecoder_get_property(GObject *object,
-                                                     guint prop_id,
-                                                     GValue *value,
-                                                     GParamSpec *pspec);
+static void gst_kaldinnet2onlinedecoder_get_property(
+    GObject *object,
+    guint prop_id,
+    GValue *value,
+    GParamSpec *pspec);
 
-static gboolean gst_kaldinnet2onlinedecoder_sink_event(GstPad *pad,
-                                                       GstObject *parent,
-                                                       GstEvent *event);
+static gboolean gst_kaldinnet2onlinedecoder_sink_event(
+    GstPad *pad,
+    GstObject *parent,
+    GstEvent *event);
 
-static GstFlowReturn gst_kaldinnet2onlinedecoder_chain(GstPad *pad,
-                                                       GstObject *parent,
-                                                       GstBuffer *buf);
+static GstFlowReturn gst_kaldinnet2onlinedecoder_chain(
+    GstPad *pad,
+    GstObject *parent,
+    GstBuffer *buf);
 
 static GstStateChangeReturn gst_kaldinnet2onlinedecoder_change_state(
-    GstElement *element, GstStateChange transition);
+    GstElement *element,
+    GstStateChange transition);
 
 static gboolean gst_kaldinnet2onlinedecoder_query(GstPad *pad, GstObject *parent, GstQuery *query);
 
@@ -245,8 +264,7 @@ static void gst_kaldinnet2onlinedecoder_finalize(GObject *object);
 /* GObject vmethod implementations */
 
 /* initialize the kaldinnet2onlinedecoder's class */
-static void gst_kaldinnet2onlinedecoder_class_init(
-    Gstkaldinnet2onlinedecoderClass *klass)
+static void gst_kaldinnet2onlinedecoder_class_init(Gstkaldinnet2onlinedecoderClass *klass)
 {
 
   GObjectClass *gobject_class;
@@ -254,7 +272,6 @@ static void gst_kaldinnet2onlinedecoder_class_init(
 
   gobject_class = (GObjectClass *)klass;
   gstelement_class = (GstElementClass *)klass;
-  GST_INFO_OBJECT(gstelement_class, "- - - gst_kaldinnet2onlinedecoder_class_init(..)");
 
   gobject_class->set_property = gst_kaldinnet2onlinedecoder_set_property;
   gobject_class->get_property = gst_kaldinnet2onlinedecoder_get_property;
@@ -265,53 +282,85 @@ static void gst_kaldinnet2onlinedecoder_class_init(
       gobject_class,
       PROP_NNET_MODE,
       g_param_spec_uint(
-          "nnet-mode", "nnet mode",
+          "nnet-mode",
+          "nnet mode",
           "2 for nnet2, 3 for nnet3",
           2,
           3,
           DEFAULT_NNET_MODE,
           (GParamFlags)G_PARAM_READWRITE));
+
   g_object_class_install_property(
       gobject_class, PROP_SILENT,
-      g_param_spec_boolean("silent", "Silent", "Silence the decoder",
-                           FALSE,
-                           (GParamFlags)G_PARAM_READWRITE));
+      g_param_spec_boolean(
+          "silent",
+          "Silent",
+          "Silence the decoder",
+          FALSE,
+          (GParamFlags)G_PARAM_READWRITE));
+
   g_object_class_install_property(
       gobject_class,
       PROP_MODEL,
-      g_param_spec_string("model", "Acoustic model",
-                          "Filename of the acoustic model",
-                          DEFAULT_MODEL,
-                          (GParamFlags)G_PARAM_READWRITE));
+      g_param_spec_string(
+          "model",
+          "Acoustic model",
+          "Filename of the acoustic model",
+          DEFAULT_MODEL,
+          (GParamFlags)G_PARAM_READWRITE));
+
+  g_object_class_install_property(
+      gobject_class,
+      PROP_MODEL_PTR,
+      g_param_spec_pointer(
+          "model-ptr",
+          "Acoustic model Pointer",
+          "The pointer to the already loaded acoustic model",
+          (GParamFlags)G_PARAM_READWRITE));
+
   g_object_class_install_property(
       gobject_class, PROP_FST,
-      g_param_spec_string("fst", "Decoding FST", "Filename of the HCLG FST",
-                          DEFAULT_FST,
-                          (GParamFlags)G_PARAM_READWRITE));
+      g_param_spec_string(
+          "fst",
+          "Decoding FST",
+          "Filename of the HCLG FST",
+          DEFAULT_FST,
+          (GParamFlags)G_PARAM_READWRITE));
+
   g_object_class_install_property(
-      gobject_class, PROP_FST_PRT,
-      g_param_spec_pointer("fst-ptr", "Decoding FST Pointer", "The pointer to the already loaded HCLG FST",
-                           (GParamFlags)G_PARAM_READWRITE));
+      gobject_class, PROP_FST_PTR,
+      g_param_spec_pointer(
+          "fst-ptr",
+          "Decoding FST Pointer",
+          "The pointer to the already loaded HCLG FST",
+          (GParamFlags)G_PARAM_READWRITE));
+
   g_object_class_install_property(
       gobject_class,
       PROP_WORD_SYMS,
-      g_param_spec_string("word-syms", "Word symbols",
-                          "Name of word symbols file (typically words.txt)",
-                          DEFAULT_WORD_SYMS,
-                          (GParamFlags)G_PARAM_READWRITE));
+      g_param_spec_string(
+          "word-syms",
+          "Word symbols",
+          "Name of word symbols file (typically words.txt)",
+          DEFAULT_WORD_SYMS,
+          (GParamFlags)G_PARAM_READWRITE));
+
   g_object_class_install_property(
       gobject_class,
       PROP_PHONE_SYMS,
-      g_param_spec_string("phone-syms", "Phoneme symbols",
-                          "Name of phoneme symbols file (typically phones.txt)",
-                          DEFAULT_PHONE_SYMS,
-                          (GParamFlags)G_PARAM_READWRITE));
+      g_param_spec_string(
+          "phone-syms",
+          "Phoneme symbols",
+          "Name of phoneme symbols file (typically phones.txt)",
+          DEFAULT_PHONE_SYMS,
+          (GParamFlags)G_PARAM_READWRITE));
 
   g_object_class_install_property(
       gobject_class,
       PROP_DO_PHONE_ALIGNMENT,
       g_param_spec_boolean(
-          "do-phone-alignment", "Phoneme-level alignment",
+          "do-phone-alignment",
+          "Phoneme-level alignment",
           "If true, output phoneme-level alignment",
           FALSE,
           (GParamFlags)G_PARAM_READWRITE));
@@ -320,7 +369,8 @@ static void gst_kaldinnet2onlinedecoder_class_init(
       gobject_class,
       PROP_DO_ENDPOINTING,
       g_param_spec_boolean(
-          "do-endpointing", "If true, apply endpoint detection",
+          "do-endpointing",
+          "If true, apply endpoint detection",
           "If true, apply endpoint detection, and split the audio at endpoints",
           FALSE,
           (GParamFlags)G_PARAM_READWRITE));
@@ -328,16 +378,19 @@ static void gst_kaldinnet2onlinedecoder_class_init(
   g_object_class_install_property(
       gobject_class,
       PROP_ADAPTATION_STATE,
-      g_param_spec_string("adaptation-state", "Adaptation state",
-                          "Current adaptation state, in stringified form, set to empty string to reset",
-                          "",
-                          (GParamFlags)G_PARAM_READWRITE));
+      g_param_spec_string(
+          "adaptation-state",
+          "Adaptation state",
+          "Current adaptation state, in stringified form, set to empty string to reset",
+          "",
+          (GParamFlags)G_PARAM_READWRITE));
 
   g_object_class_install_property(
       gobject_class,
       PROP_INVERSE_SCALE,
       g_param_spec_boolean(
-          "inverse-scale", "If true, inverse acoustic scale in lattice",
+          "inverse-scale",
+          "If true, inverse acoustic scale in lattice",
           "If true, inverse the acoustic scaling of the output lattice",
           FALSE,
           (GParamFlags)G_PARAM_READWRITE));
@@ -346,7 +399,8 @@ static void gst_kaldinnet2onlinedecoder_class_init(
       gobject_class,
       PROP_LMWT_SCALE,
       g_param_spec_float(
-          "lmwt-scale", "LM weight for scaling output lattice",
+          "lmwt-scale",
+          "LM weight for scaling output lattice",
           "LM scaling for the output lattice, usually in conjunction with inverse-scaling=true",
           G_MINFLOAT,
           G_MAXFLOAT,
@@ -357,7 +411,8 @@ static void gst_kaldinnet2onlinedecoder_class_init(
       gobject_class,
       PROP_CHUNK_LENGTH_IN_SECS,
       g_param_spec_float(
-          "chunk-length-in-secs", "Length of a audio chunk that is processed at a time",
+          "chunk-length-in-secs",
+          "Length of a audio chunk that is processed at a time",
           "Smaller values decrease latency, bigger values (e.g. 0.2) improve speed if multithreaded BLAS/MKL is used",
           0.05,
           G_MAXFLOAT,
@@ -368,7 +423,8 @@ static void gst_kaldinnet2onlinedecoder_class_init(
       gobject_class,
       PROP_TRACEBACK_PERIOD_IN_SECS,
       g_param_spec_float(
-          "traceback-period-in-secs", "Time period after which new interim recognition result is sent",
+          "traceback-period-in-secs",
+          "Time period after which new interim recognition result is sent",
           "Time period after which new interim recognition result is sent",
           0.05,
           G_MAXFLOAT,
@@ -381,7 +437,9 @@ static void gst_kaldinnet2onlinedecoder_class_init(
       g_param_spec_string(
           "lm-fst",
           "Language language model FST (G.fst), only needed when rescoring with the constant ARPA LM",
-          "Old LM as FST (G.fst)", "", (GParamFlags)G_PARAM_READWRITE));
+          "Old LM as FST (G.fst)",
+          "",
+          (GParamFlags)G_PARAM_READWRITE));
 
   g_object_class_install_property(
       gobject_class,
@@ -415,7 +473,8 @@ static void gst_kaldinnet2onlinedecoder_class_init(
       gobject_class,
       PROP_NUM_NBEST,
       g_param_spec_uint(
-          "num-nbest", "num-nbest",
+          "num-nbest",
+          "num-nbest",
           "number of hypotheses in the full final results",
           1,
           10000,
@@ -426,7 +485,8 @@ static void gst_kaldinnet2onlinedecoder_class_init(
       gobject_class,
       PROP_NUM_PHONE_ALIGNMENT,
       g_param_spec_uint(
-          "num-phone-alignment", "num-phone-alignment",
+          "num-phone-alignment",
+          "num-phone-alignment",
           "number of hypotheses where alignment should be done",
           1,
           10000,
@@ -437,13 +497,13 @@ static void gst_kaldinnet2onlinedecoder_class_init(
       gobject_class,
       PROP_MIN_WORDS_FOR_IVECTOR,
       g_param_spec_uint(
-          "min-words-for-ivector", "threshold for updating ivector (adaptation state)",
+          "min-words-for-ivector",
+          "threshold for updating ivector (adaptation state)",
           "Minimal number of words in the first transcription for triggering update of the adaptation state",
           0,
           10000,
           DEFAULT_MIN_WORDS_FOR_IVECTOR,
           (GParamFlags)G_PARAM_READWRITE));
-
 
   bool tmp_bool;
   int32 tmp_int;
@@ -519,95 +579,144 @@ static void gst_kaldinnet2onlinedecoder_class_init(
 
     switch (option_info.type)
     {
+    //Booloean options from the different components
     case SimpleOptions::kBool:
       simple_options->GetOption(name, &tmp_bool);
       g_object_class_install_property(
           G_OBJECT_CLASS(klass),
           PROP_LAST + i,
-          g_param_spec_boolean(name.c_str(), option_info.doc.c_str(),
-                               option_info.doc.c_str(), tmp_bool,
-                               (GParamFlags)G_PARAM_READWRITE));
+          g_param_spec_boolean(
+              name.c_str(),
+              option_info.doc.c_str(),
+              option_info.doc.c_str(),
+              tmp_bool,
+              (GParamFlags)G_PARAM_READWRITE));
       break;
+
+    //int options from the different components
     case SimpleOptions::kInt32:
       simple_options->GetOption(name, &tmp_int);
       g_object_class_install_property(
           G_OBJECT_CLASS(klass),
           PROP_LAST + i,
-          g_param_spec_int(name.c_str(), option_info.doc.c_str(),
-                           option_info.doc.c_str(),
-                           G_MININT,
-                           G_MAXINT, tmp_int,
-                           (GParamFlags)G_PARAM_READWRITE));
+          g_param_spec_int(
+              name.c_str(),
+              option_info.doc.c_str(),
+              option_info.doc.c_str(),
+              G_MININT,
+              G_MAXINT,
+              tmp_int,
+              (GParamFlags)G_PARAM_READWRITE));
       break;
+
+    //uint options from the different components
     case SimpleOptions::kUint32:
       simple_options->GetOption(name, &tmp_uint);
       g_object_class_install_property(
           G_OBJECT_CLASS(klass),
           PROP_LAST + i,
-          g_param_spec_uint(name.c_str(), option_info.doc.c_str(),
-                            option_info.doc.c_str(), 0,
-                            G_MAXUINT,
-                            tmp_uint, (GParamFlags)G_PARAM_READWRITE));
+          g_param_spec_uint(
+              name.c_str(),
+              option_info.doc.c_str(),
+              option_info.doc.c_str(),
+              0,
+              G_MAXUINT,
+              tmp_uint,
+              (GParamFlags)G_PARAM_READWRITE));
       break;
+
+    //float options from the different components
     case SimpleOptions::kFloat:
       simple_options->GetOption(name, &tmp_float);
       g_object_class_install_property(
           G_OBJECT_CLASS(klass),
           PROP_LAST + i,
-          g_param_spec_float(name.c_str(), option_info.doc.c_str(),
-                             option_info.doc.c_str(),
-                             -std::numeric_limits<float>::infinity(),
-                             std::numeric_limits<float>::infinity(), tmp_float,
-                             (GParamFlags)G_PARAM_READWRITE));
+          g_param_spec_float(
+              name.c_str(),
+              option_info.doc.c_str(),
+              option_info.doc.c_str(),
+              -std::numeric_limits<float>::infinity(),
+              std::numeric_limits<float>::infinity(),
+              tmp_float,
+              (GParamFlags)G_PARAM_READWRITE));
       break;
+
+    //double options from the different components
     case SimpleOptions::kDouble:
       simple_options->GetOption(name, &tmp_double);
       g_object_class_install_property(
           G_OBJECT_CLASS(klass),
           PROP_LAST + i,
-          g_param_spec_double(name.c_str(), option_info.doc.c_str(),
-                              option_info.doc.c_str(),
-                              -std::numeric_limits<double>::infinity(),
-                              -std::numeric_limits<double>::infinity(), tmp_double,
-                              (GParamFlags)G_PARAM_READWRITE));
+          g_param_spec_double(
+              name.c_str(), option_info.doc.c_str(),
+              option_info.doc.c_str(),
+              -std::numeric_limits<double>::infinity(),
+              -std::numeric_limits<double>::infinity(),
+              tmp_double,
+              (GParamFlags)G_PARAM_READWRITE));
       break;
+
+    //string options from the different components
     case SimpleOptions::kString:
       simple_options->GetOption(name, &tmp_string);
       g_object_class_install_property(
           G_OBJECT_CLASS(klass),
           PROP_LAST + i,
-          g_param_spec_string(name.c_str(), option_info.doc.c_str(),
-                              option_info.doc.c_str(), tmp_string.c_str(),
-                              (GParamFlags)G_PARAM_READWRITE));
+          g_param_spec_string(
+              name.c_str(),
+              option_info.doc.c_str(),
+              option_info.doc.c_str(),
+              tmp_string.c_str(),
+              (GParamFlags)G_PARAM_READWRITE));
       break;
     }
     i += 1;
   }
 
+  //Signals we can send back to the gstream pipeline
   gst_kaldinnet2onlinedecoder_signals[PARTIAL_RESULT_SIGNAL] = g_signal_new(
-      "partial-result", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
+      "partial-result",
+      G_TYPE_FROM_CLASS(klass),
+      G_SIGNAL_RUN_LAST,
       G_STRUCT_OFFSET(Gstkaldinnet2onlinedecoderClass, partial_result),
       NULL,
-      NULL, kaldi_marshal_VOID__STRING, G_TYPE_NONE, 1,
+      NULL,
+      kaldi_marshal_VOID__STRING,
+      G_TYPE_NONE,
+      1,
       G_TYPE_STRING);
 
   gst_kaldinnet2onlinedecoder_signals[FINAL_RESULT_SIGNAL] = g_signal_new(
-      "final-result", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
+      "final-result",
+      G_TYPE_FROM_CLASS(klass),
+      G_SIGNAL_RUN_LAST,
       G_STRUCT_OFFSET(Gstkaldinnet2onlinedecoderClass, final_result),
       NULL,
-      NULL, kaldi_marshal_VOID__STRING, G_TYPE_NONE, 1,
+      NULL,
+      kaldi_marshal_VOID__STRING,
+      G_TYPE_NONE,
+      1,
       G_TYPE_STRING);
 
   gst_kaldinnet2onlinedecoder_signals[FULL_FINAL_RESULT_SIGNAL] = g_signal_new(
-      "full-final-result", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
+      "full-final-result",
+      G_TYPE_FROM_CLASS(klass),
+      G_SIGNAL_RUN_LAST,
       G_STRUCT_OFFSET(Gstkaldinnet2onlinedecoderClass, full_final_result),
       NULL,
-      NULL, kaldi_marshal_VOID__STRING, G_TYPE_NONE, 1,
+      NULL,
+      kaldi_marshal_VOID__STRING,
+      G_TYPE_NONE,
+      1,
       G_TYPE_STRING);
 
+  //Info about this gstream element
   gst_element_class_set_details_simple(
-      gstelement_class, "KaldiNNet2OnlineDecoder", "Speech/Audio",
-      "Convert speech to text", "Tanel Alumae <tanel.alumae@phon.ioc.ee>");
+      gstelement_class,
+      "KaldiNNet2OnlineDecoder",
+      "Speech/Audio",
+      "Convert speech to text",
+      "Tanel Alumae <tanel.alumae@phon.ioc.ee>");
 
   gst_element_class_add_pad_template(gstelement_class,
                                      gst_static_pad_template_get(&src_template));
@@ -674,7 +783,6 @@ static void gst_kaldinnet2onlinedecoder_init(
   filter->num_nbest = DEFAULT_NUM_NBEST;
   filter->min_words_for_ivector = DEFAULT_MIN_WORDS_FOR_IVECTOR;
 
-  
   filter->simple_options = new SimpleOptionsGst();
 
   filter->endpoint_config = new OnlineEndpointConfig();
@@ -767,7 +875,7 @@ static void gst_kaldinnet2onlinedecoder_set_property(GObject *object,
   case PROP_FST:
     gst_kaldinnet2onlinedecoder_load_fst(filter, value);
     break;
-  case PROP_FST_PRT:
+  case PROP_FST_PTR:
     gst_kaldinnet2onlinedecoder_load_fst_ptr(filter, value);
     break;
   case PROP_WORD_SYMS:
@@ -894,10 +1002,11 @@ static void gst_kaldinnet2onlinedecoder_set_property(GObject *object,
   }
 }
 
-static void gst_kaldinnet2onlinedecoder_get_property(GObject *object,
-                                                     guint prop_id,
-                                                     GValue *value,
-                                                     GParamSpec *pspec)
+static void gst_kaldinnet2onlinedecoder_get_property(
+    GObject *object,
+    guint prop_id,
+    GValue *value,
+    GParamSpec *pspec)
 {
   bool tmp_bool;
   int32 tmp_int;
@@ -923,7 +1032,7 @@ static void gst_kaldinnet2onlinedecoder_get_property(GObject *object,
   case PROP_FST:
     g_value_set_string(value, filter->fst_rspecifier);
     break;
-  case PROP_FST_PRT:
+  case PROP_FST_PTR:
     gpointer decode_fst_ptr;
     if (filter->decode_fst)
     {
@@ -1034,7 +1143,8 @@ static void gst_kaldinnet2onlinedecoder_get_property(GObject *object,
 }
 
 static std::vector<PhoneAlignmentInfo> gst_kaldinnet2onlinedecoder_phone_alignment(
-    Gstkaldinnet2onlinedecoder *filter, const std::vector<int32> &alignment,
+    Gstkaldinnet2onlinedecoder *filter,
+    const std::vector<int32> &alignment,
     const CompactLattice &clat)
 {
 
@@ -1132,7 +1242,8 @@ static std::vector<WordAlignmentInfo> gst_kaldinnet2onlinedecoder_word_alignment
 }
 
 static void gst_kaldinnet2onlinedecoder_scale_lattice(
-    Gstkaldinnet2onlinedecoder *filter, CompactLattice &clat)
+    Gstkaldinnet2onlinedecoder *filter,
+    CompactLattice &clat)
 {
   if (filter->inverse_scale)
   {
@@ -1344,7 +1455,8 @@ static std::string gst_kaldinnet2onlinedecoder_full_final_result_to_json(
 }
 
 static void gst_kaldinnet2onlinedecoder_final_result(
-    Gstkaldinnet2onlinedecoder *filter, CompactLattice &clat,
+    Gstkaldinnet2onlinedecoder *filter,
+    CompactLattice &clat,
     guint *num_words)
 {
   if (clat.NumStates() == 0)
@@ -1388,7 +1500,8 @@ static void gst_kaldinnet2onlinedecoder_final_result(
 }
 
 static void gst_kaldinnet2onlinedecoder_partial_result(
-    Gstkaldinnet2onlinedecoder *filter, const Lattice lat)
+    Gstkaldinnet2onlinedecoder *filter,
+    const Lattice lat)
 {
   std::vector<int32> words;
   std::vector<int32> alignment;
@@ -1406,7 +1519,9 @@ static void gst_kaldinnet2onlinedecoder_partial_result(
 }
 
 static bool gst_kaldinnet2onlinedecoder_rescore_big_lm(
-    Gstkaldinnet2onlinedecoder *filter, CompactLattice &clat, CompactLattice &result_lat)
+    Gstkaldinnet2onlinedecoder *filter,
+    CompactLattice &clat,
+    CompactLattice &result_lat)
 {
 
   Lattice tmp_lattice;
@@ -1465,21 +1580,23 @@ static bool gst_kaldinnet2onlinedecoder_rescore_big_lm(
   return true;
 }
 
-static void gst_kaldinnet2onlinedecoder_threaded_decode_segment(Gstkaldinnet2onlinedecoder *filter,
-                                                                bool &more_data,
-                                                                int32 chunk_length,
-                                                                BaseFloat traceback_period_secs,
-                                                                Vector<BaseFloat> *remaining_wave_part)
+static void gst_kaldinnet2onlinedecoder_threaded_decode_segment(
+    Gstkaldinnet2onlinedecoder *filter,
+    bool &more_data,
+    int32 chunk_length,
+    BaseFloat traceback_period_secs,
+    Vector<BaseFloat> *remaining_wave_part)
 {
-  SingleUtteranceNnet2DecoderThreaded decoder(*(filter->nnet2_decoding_threaded_config),
-                                              *(filter->trans_model), *(filter->am_nnet2),
-                                              *(filter->decode_fst),
-                                              *(filter->feature_info),
-                                              *(filter->adaptation_state));
+  SingleUtteranceNnet2DecoderThreaded decoder(
+      *(filter->nnet2_decoding_threaded_config),
+      *(filter->trans_model), *(filter->am_nnet2),
+      *(filter->decode_fst),
+      *(filter->feature_info),
+      *(filter->adaptation_state));
 
   Vector<BaseFloat> wave_part = Vector<BaseFloat>(chunk_length);
-  GST_DEBUG_OBJECT(filter, "Reading audio in %d sample chunks...",
-                   wave_part.Dim());
+  GST_DEBUG_OBJECT(filter, "Reading audio in %d sample chunks...", wave_part.Dim());
+
   BaseFloat last_traceback = 0.0;
   BaseFloat num_seconds_decoded = 0.0;
   if (remaining_wave_part->Dim() > 0)
@@ -1506,10 +1623,12 @@ static void gst_kaldinnet2onlinedecoder_threaded_decode_segment(Gstkaldinnet2onl
 
     if (filter->do_endpointing)
     {
-      GST_DEBUG_OBJECT(filter, "Before the sleep check: Frames received: ~ %d, frames decoded: %d, pieces pending: %d",
-                       decoder.NumFramesReceivedApprox(),
-                       decoder.NumFramesDecoded(),
-                       decoder.NumWaveformPiecesPending());
+      GST_DEBUG_OBJECT(
+          filter,
+          "Before the sleep check: Frames received: ~ %d, frames decoded: %d, pieces pending: %d",
+          decoder.NumFramesReceivedApprox(),
+          decoder.NumFramesDecoded(),
+          decoder.NumWaveformPiecesPending());
 
       // Wait until there are less than one second of frames left to decode
       // Depends of the frame shift, but one second is also selected arbitrarily
@@ -1518,10 +1637,12 @@ static void gst_kaldinnet2onlinedecoder_threaded_decode_segment(Gstkaldinnet2onl
         Sleep(0.1);
       }
 
-      GST_DEBUG_OBJECT(filter, "After the sleep check: Frames received: ~ %d, frames decoded: %d, pieces pending: %d",
-                       decoder.NumFramesReceivedApprox(),
-                       decoder.NumFramesDecoded(),
-                       decoder.NumWaveformPiecesPending());
+      GST_DEBUG_OBJECT(
+          filter,
+          "After the sleep check: Frames received: ~ %d, frames decoded: %d, pieces pending: %d",
+          decoder.NumFramesReceivedApprox(),
+          decoder.NumFramesDecoded(),
+          decoder.NumWaveformPiecesPending());
 
       if ((decoder.NumFramesDecoded() > 0) && decoder.EndpointDetected(*(filter->endpoint_config)))
       {
@@ -1578,10 +1699,11 @@ static void gst_kaldinnet2onlinedecoder_threaded_decode_segment(Gstkaldinnet2onl
   }
 }
 
-static void gst_kaldinnet2onlinedecoder_unthreaded_decode_segment(Gstkaldinnet2onlinedecoder *filter,
-                                                                  bool &more_data,
-                                                                  int32 chunk_length,
-                                                                  BaseFloat traceback_period_secs)
+static void gst_kaldinnet2onlinedecoder_unthreaded_decode_segment(
+    Gstkaldinnet2onlinedecoder *filter,
+    bool &more_data,
+    int32 chunk_length,
+    BaseFloat traceback_period_secs)
 {
 
   OnlineNnet2FeaturePipeline feature_pipeline(*(filter->feature_info));
@@ -1675,21 +1797,26 @@ static void gst_kaldinnet2onlinedecoder_unthreaded_decode_segment(Gstkaldinnet2o
 }
 
 // for nnet3, we keep this duplication to allow nnet3 specific changes
-static void gst_kaldinnet2onlinedecoder_nnet3_unthreaded_decode_segment(Gstkaldinnet2onlinedecoder *filter,
-                                                                        bool &more_data,
-                                                                        int32 chunk_length,
-                                                                        BaseFloat traceback_period_secs)
+static void gst_kaldinnet2onlinedecoder_nnet3_unthreaded_decode_segment(
+    Gstkaldinnet2onlinedecoder *filter,
+    bool &more_data,
+    int32 chunk_length,
+    BaseFloat traceback_period_secs)
 {
 
   OnlineNnet2FeaturePipeline feature_pipeline(*(filter->feature_info));
   feature_pipeline.SetAdaptationState(*(filter->adaptation_state));
-  SingleUtteranceNnet3Decoder decoder(*(filter->decoder_opts),
-                                      *(filter->trans_model),
-                                      *(filter->decodable_info_nnet3),
-                                      *(filter->decode_fst),
-                                      &feature_pipeline);
-  OnlineSilenceWeighting silence_weighting(*(filter->trans_model),
-                                           *(filter->silence_weighting_config));
+
+  SingleUtteranceNnet3Decoder decoder(
+      *(filter->decoder_opts),
+      *(filter->trans_model),
+      *(filter->decodable_info_nnet3),
+      *(filter->decode_fst),
+      &feature_pipeline);
+
+  OnlineSilenceWeighting silence_weighting(
+      *(filter->trans_model),
+      *(filter->silence_weighting_config));
 
   Vector<BaseFloat> wave_part = Vector<BaseFloat>(chunk_length);
   std::vector<std::pair<int32, BaseFloat>> delta_weights;
@@ -1818,8 +1945,7 @@ static void gst_kaldinnet2onlinedecoder_loop(
 
 /* GstElement vmethod implementations */
 
-static gboolean
-gst_kaldinnet2onlinedecoder_query(GstPad *pad, GstObject *parent, GstQuery *query)
+static gboolean gst_kaldinnet2onlinedecoder_query(GstPad *pad, GstObject *parent, GstQuery *query)
 {
   gboolean ret;
   Gstkaldinnet2onlinedecoder *filter;
@@ -1854,9 +1980,10 @@ gst_kaldinnet2onlinedecoder_query(GstPad *pad, GstObject *parent, GstQuery *quer
 }
 
 /* this function handles sink events */
-static gboolean gst_kaldinnet2onlinedecoder_sink_event(GstPad *pad,
-                                                       GstObject *parent,
-                                                       GstEvent *event)
+static gboolean gst_kaldinnet2onlinedecoder_sink_event(
+    GstPad *pad,
+    GstObject *parent,
+    GstEvent *event)
 {
   gboolean ret;
   Gstkaldinnet2onlinedecoder *filter;
@@ -1871,9 +1998,11 @@ static gboolean gst_kaldinnet2onlinedecoder_sink_event(GstPad *pad,
   {
     GST_DEBUG_OBJECT(filter, "Starting decoding task");
     filter->decoding = true;
-    gst_pad_start_task(filter->srcpad,
-                       (GstTaskFunction)gst_kaldinnet2onlinedecoder_loop,
-                       filter, NULL);
+    gst_pad_start_task(
+        filter->srcpad,
+        (GstTaskFunction)gst_kaldinnet2onlinedecoder_loop,
+        filter,
+        NULL);
 
     GST_DEBUG_OBJECT(filter, "Started decoding task");
     ret = TRUE;
@@ -1910,9 +2039,10 @@ static gboolean gst_kaldinnet2onlinedecoder_sink_event(GstPad *pad,
 /* chain function
  * this function does the actual processing
  */
-static GstFlowReturn gst_kaldinnet2onlinedecoder_chain(GstPad *pad,
-                                                       GstObject *parent,
-                                                       GstBuffer *buf)
+static GstFlowReturn gst_kaldinnet2onlinedecoder_chain(
+    GstPad *pad,
+    GstObject *parent,
+    GstBuffer *buf)
 {
   Gstkaldinnet2onlinedecoder *filter = GST_KALDINNET2ONLINEDECODER(parent);
 
@@ -1937,9 +2067,9 @@ not_negotiated:
 }
 }
 
-static void
-gst_kaldinnet2onlinedecoder_load_word_syms(Gstkaldinnet2onlinedecoder *filter,
-                                           const GValue *value)
+static void gst_kaldinnet2onlinedecoder_load_word_syms(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value)
 {
   if (G_VALUE_HOLDS_STRING(value))
   {
@@ -1985,9 +2115,9 @@ gst_kaldinnet2onlinedecoder_load_word_syms(Gstkaldinnet2onlinedecoder *filter,
   }
 }
 
-static void
-gst_kaldinnet2onlinedecoder_load_phone_syms(Gstkaldinnet2onlinedecoder *filter,
-                                            const GValue *value)
+static void gst_kaldinnet2onlinedecoder_load_phone_syms(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value)
 {
   if (G_VALUE_HOLDS_STRING(value))
   {
@@ -2033,9 +2163,9 @@ gst_kaldinnet2onlinedecoder_load_phone_syms(Gstkaldinnet2onlinedecoder *filter,
   }
 }
 
-static void
-gst_kaldinnet2onlinedecoder_load_word_boundary_info(Gstkaldinnet2onlinedecoder *filter,
-                                                    const GValue *value)
+static void gst_kaldinnet2onlinedecoder_load_word_boundary_info(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value)
 {
   if (G_VALUE_HOLDS_STRING(value))
   {
@@ -2081,9 +2211,9 @@ gst_kaldinnet2onlinedecoder_load_word_boundary_info(Gstkaldinnet2onlinedecoder *
   }
 }
 
-static void
-gst_kaldinnet2onlinedecoder_load_model(Gstkaldinnet2onlinedecoder *filter,
-                                       const GValue *value)
+static void gst_kaldinnet2onlinedecoder_load_model(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value)
 {
   if (G_VALUE_HOLDS_STRING(value))
   {
@@ -2148,9 +2278,9 @@ gst_kaldinnet2onlinedecoder_load_model(Gstkaldinnet2onlinedecoder *filter,
   }
 }
 
-static void
-gst_kaldinnet2onlinedecoder_load_fst(Gstkaldinnet2onlinedecoder *filter,
-                                     const GValue *value)
+static void gst_kaldinnet2onlinedecoder_load_fst(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value)
 {
   if (G_VALUE_HOLDS_STRING(value))
   {
@@ -2192,9 +2322,9 @@ gst_kaldinnet2onlinedecoder_load_fst(Gstkaldinnet2onlinedecoder *filter,
   }
 }
 
-static void
-gst_kaldinnet2onlinedecoder_load_fst_ptr(Gstkaldinnet2onlinedecoder *filter,
-                                         const GValue *value)
+static void gst_kaldinnet2onlinedecoder_load_fst_ptr(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value)
 {
   if (G_VALUE_HOLDS_POINTER(value))
   {
@@ -2223,9 +2353,9 @@ gst_kaldinnet2onlinedecoder_load_fst_ptr(Gstkaldinnet2onlinedecoder *filter,
   }
 }
 
-static void
-gst_kaldinnet2onlinedecoder_load_lm_fst(Gstkaldinnet2onlinedecoder *filter,
-                                        const GValue *value)
+static void gst_kaldinnet2onlinedecoder_load_lm_fst(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value)
 {
   if (G_VALUE_HOLDS_STRING(value))
   {
@@ -2275,9 +2405,11 @@ gst_kaldinnet2onlinedecoder_load_lm_fst(Gstkaldinnet2onlinedecoder *filter,
         // Change the options for TableCompose to match the input
         // (because it's the arcs of the LM FST we want to do lookup
         // on).
-        fst::TableComposeOptions compose_opts(fst::TableMatcherOptions(),
-                                              true, fst::SEQUENCE_FILTER,
-                                              fst::MATCH_INPUT);
+        fst::TableComposeOptions compose_opts(
+            fst::TableMatcherOptions(),
+            true,
+            fst::SEQUENCE_FILTER,
+            fst::MATCH_INPUT);
 
         // The following is an optimization for the TableCompose
         // composition: it stores certain tables that enable fast
@@ -2302,9 +2434,9 @@ gst_kaldinnet2onlinedecoder_load_lm_fst(Gstkaldinnet2onlinedecoder *filter,
   }
 }
 
-static void
-gst_kaldinnet2onlinedecoder_load_big_lm(Gstkaldinnet2onlinedecoder *filter,
-                                        const GValue *value)
+static void gst_kaldinnet2onlinedecoder_load_big_lm(
+    Gstkaldinnet2onlinedecoder *filter,
+    const GValue *value)
 {
   if (G_VALUE_HOLDS_STRING(value))
   {
@@ -2343,8 +2475,7 @@ gst_kaldinnet2onlinedecoder_load_big_lm(Gstkaldinnet2onlinedecoder *filter,
   }
 }
 
-static bool
-gst_kaldinnet2onlinedecoder_allocate(
+static bool gst_kaldinnet2onlinedecoder_allocate(
     Gstkaldinnet2onlinedecoder *filter)
 {
   GST_INFO_OBJECT(filter, "Loading Kaldi models and feature extractor");
@@ -2483,13 +2614,17 @@ static gboolean kaldinnet2onlinedecoder_init(
    *
    * exchange the string 'Template kaldinnet2onlinedecoder' with your description
    */
-  GST_DEBUG_CATEGORY_INIT(gst_kaldinnet2onlinedecoder_debug,
-                          "kaldinnet2onlinedecoder", 0,
-                          "Template kaldinnet2onlinedecoder");
+  GST_DEBUG_CATEGORY_INIT(
+      gst_kaldinnet2onlinedecoder_debug,
+      "kaldinnet2onlinedecoder",
+      0,
+      "Template kaldinnet2onlinedecoder");
 
-  return gst_element_register(kaldinnet2onlinedecoder,
-                              "kaldinnet2onlinedecoder", GST_RANK_NONE,
-                              GST_TYPE_KALDINNET2ONLINEDECODER);
+  return gst_element_register(
+      kaldinnet2onlinedecoder,
+      "kaldinnet2onlinedecoder",
+      GST_RANK_NONE,
+      GST_TYPE_KALDINNET2ONLINEDECODER);
 }
 
 /* PACKAGE: this is usually set by autotools depending on some _INIT macro
@@ -2508,8 +2643,13 @@ static gboolean kaldinnet2onlinedecoder_init(
  * License is specified as "unknown" because gstreamer doesn't recognize "Apache" as
  * a license and blacklists the module :S
  */
-GST_PLUGIN_DEFINE(GST_VERSION_MAJOR, GST_VERSION_MINOR, kaldinnet2onlinedecoder,
-                  "kaldinnet2onlinedecoder",
-                  kaldinnet2onlinedecoder_init, VERSION, "unknown", "GStreamer",
-                  "http://gstreamer.net/")
+GST_PLUGIN_DEFINE(
+  GST_VERSION_MAJOR, 
+  GST_VERSION_MINOR,
+  kaldinnet2onlinedecoder,
+  "kaldinnet2onlinedecoder",
+  kaldinnet2onlinedecoder_init,
+  VERSION, "unknown", 
+  "GStreamer",
+  "http://gstreamer.net/")
 } // namespace kaldi
