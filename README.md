@@ -3,12 +3,7 @@
 Have started on optimizing the plugin to accept an already loaded FST model. 
 This will reduce the load time and you can have multiple decoders running sharing the same models (the read-only onces).
 
-Why? Because the FST model can become very big, and if you want mulitple decoders running the host can easy run out of memory. 
-
-## Changelog
-
-- Added: Property: word-syms-ptr - A pointer to an already loaded word symbols, this can be shared between multiple instances of the Kaldi Gst elements. 
-- Added: Property: fst-ptr - A pointer to an already loaded HCLG FST, this can be shared between multiple instances of the Kaldi Gst elements. 
+Why? Because the FST model can become very big, and if you want mulitple decoders, the host will run out of memory fast. 
 
 # WHAT IT IS
 
@@ -17,6 +12,11 @@ GStreamer plugin that wraps Kaldi's SingleUtteranceNnet2Decoder. It requires iVe
 DNN acoustic models. The iVectors are adapted to the current audio stream automatically.
 
 # CHANGELOG
+2018-06-22: Memory optimization, can recive the word-syms and fst as pointers to preloaded models. 
+- Added: Property: word-syms-ptr - A pointer to an already loaded word symbols, this can be shared between multiple instances of the Kaldi Gst elements. 
+- Added: Property: fst-ptr - A pointer to an already loaded HCLG FST, this can be shared between multiple instances of the Kaldi Gst elements. 
+
+
 2017-08-09: Also implemented phone confidence scores, which are included with phone alignments.
 Note that phone confidence scores are very inaccurate.
 
