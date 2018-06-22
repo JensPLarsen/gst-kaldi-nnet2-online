@@ -1,9 +1,14 @@
 # Work in progress (not stable)
 
 Have started on optimizing the plugin to accept an already loaded FST model. 
-This will reduce the load time and you can have multiple decoders running sharing the same FST model (memory optimization). 
+This will reduce the load time and you can have multiple decoders running sharing the same models (the read-only onces).
 
-Why? Because the FST model can become very big, and if you want mulitple decoders running it is easy run out of memory. 
+Why? Because the FST model can become very big, and if you want mulitple decoders running the host can easy run out of memory. 
+
+## Changelog
+
+- Added: Property: word-syms-ptr - A pointer to an already loaded word symbols, this can be shared between multiple instances of the Kaldi Gst elements. 
+- Added: Property: fst-ptr - A pointer to an already loaded HCLG FST, this can be shared between multiple instances of the Kaldi Gst elements. 
 
 # WHAT IT IS
 
