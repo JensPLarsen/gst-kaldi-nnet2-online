@@ -508,6 +508,7 @@ static void gst_kaldinnet2onlinedecoder_class_init(Gstkaldinnet2onlinedecoderCla
           DEFAULT_MIN_WORDS_FOR_IVECTOR,
           (GParamFlags)G_PARAM_READWRITE));
 
+  //Creates temporary elements, to get their <element>->Register(simple_options), so we can expose their properties
   bool tmp_bool;
   int32 tmp_int;
   uint32 tmp_uint;
@@ -515,7 +516,6 @@ static void gst_kaldinnet2onlinedecoder_class_init(Gstkaldinnet2onlinedecoderCla
   double tmp_double;
   std::string tmp_string;
   SimpleOptionsGst *simple_options = new SimpleOptionsGst();
-
   OnlineEndpointConfig *endpoint_config = new OnlineEndpointConfig();
   OnlineNnet2FeaturePipelineConfig *feature_config = new OnlineNnet2FeaturePipelineConfig();
   OnlineNnet2DecodingConfig *nnet2_decoding_config = new OnlineNnet2DecodingConfig();
@@ -727,6 +727,17 @@ static void gst_kaldinnet2onlinedecoder_class_init(Gstkaldinnet2onlinedecoderCla
       
   gst_element_class_add_pad_template(
       gstelement_class, gst_static_pad_template_get(&sink_template));
+
+
+  //Clean up
+  delete endpoint_config;
+  delete feature_config;
+  delete nnet2_decoding_config;
+  delete nnet3_decodable_opts;
+  delete decoder_opts;
+  delete silence_weighting_config;
+  delete simple_options;
+
 }
 
 /* initialize the new element
