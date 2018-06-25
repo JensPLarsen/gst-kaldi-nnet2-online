@@ -1,4 +1,4 @@
-# Work in progress (not stable)
+# Memory Optimization
 
 Have started on optimizing the plugin to accept an already loaded FST model. 
 This will reduce the load time and you can have multiple decoders running sharing the same models (the read-only onces).
