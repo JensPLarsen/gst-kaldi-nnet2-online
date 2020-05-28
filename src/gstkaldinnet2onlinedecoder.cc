@@ -1606,125 +1606,6 @@ static bool gst_kaldinnet2onlinedecoder_rescore_big_lm(
   return true;
 }
 
-static void gst_kaldinnet2onlinedecoder_threaded_decode_segment(
-    Gstkaldinnet2onlinedecoder *filter,
-    bool &more_data,
-    int32 chunk_length,
-    BaseFloat traceback_period_secs,
-    Vector<BaseFloat> *remaining_wave_part)
-{
-  SingleUtteranceNnet2DecoderThreaded decoder(
-      *(filter->nnet2_decoding_threaded_config),
-      *(filter->trans_model), *(filter->am_nnet2),
-      *(filter->decode_fst),
-      *(filter->feature_info),
-      *(filter->adaptation_state));
-
-  Vector<BaseFloat> wave_part = Vector<BaseFloat>(chunk_length);
-  GST_DEBUG_OBJECT(filter, "Reading audio in %d sample chunks...", wave_part.Dim());
-
-  BaseFloat last_traceback = 0.0;
-  BaseFloat num_seconds_decoded = 0.0;
-  if (remaining_wave_part->Dim() > 0)
-  {
-    GST_DEBUG_OBJECT(filter, "Submitting remaining wave of size %d", remaining_wave_part->Dim());
-    decoder.AcceptWaveform(filter->sample_rate, *remaining_wave_part);
-    filter->total_time_decoded += 1.0 * remaining_wave_part->Dim() / filter->sample_rate;
-    while (decoder.NumFramesReceivedApprox() - decoder.NumFramesDecoded() > 100)
-    {
-      Sleep(0.1);
-    }
-  }
-  while (true)
-  {
-    more_data = filter->audio_source->Read(&wave_part);
-    GST_DEBUG_OBJECT(filter, "Submitting wave of size: %d", wave_part.Dim());
-    decoder.AcceptWaveform(filter->sample_rate, wave_part);
-    filter->total_time_decoded += 1.0 * wave_part.Dim() / filter->sample_rate;
-    if (!more_data)
-    {
-      decoder.InputFinished();
-      break;
-    }
-
-    if (filter->do_endpointing)
-    {
-      GST_DEBUG_OBJECT(
-          filter,
-          "Before the sleep check: Frames received: ~ %d, frames decoded: %d, pieces pending: %d",
-          decoder.NumFramesReceivedApprox(),
-          decoder.NumFramesDecoded(),
-          decoder.NumWaveformPiecesPending());
-
-      // Wait until there are less than one second of frames left to decode
-      // Depends of the frame shift, but one second is also selected arbitrarily
-      while (decoder.NumFramesReceivedApprox() - decoder.NumFramesDecoded() > 100)
-      {
-        Sleep(0.1);
-      }
-
-      GST_DEBUG_OBJECT(
-          filter,
-          "After the sleep check: Frames received: ~ %d, frames decoded: %d, pieces pending: %d",
-          decoder.NumFramesReceivedApprox(),
-          decoder.NumFramesDecoded(),
-          decoder.NumWaveformPiecesPending());
-
-      if ((decoder.NumFramesDecoded() > 0) && decoder.EndpointDetected(*(filter->endpoint_config)))
-      {
-        decoder.TerminateDecoding();
-        GST_DEBUG_OBJECT(filter, "Endpoint detected!");
-        break;
-      }
-    }
-    num_seconds_decoded += filter->chunk_length_in_secs;
-    if ((num_seconds_decoded - last_traceback > traceback_period_secs) && (decoder.NumFramesDecoded() > 0))
-    {
-      Lattice lat;
-      decoder.GetBestPath(false, &lat, NULL);
-      gst_kaldinnet2onlinedecoder_partial_result(filter, lat);
-      last_traceback += traceback_period_secs;
-    }
-  }
-
-  decoder.Wait();
-
-  decoder.GetRemainingWaveform(remaining_wave_part);
-  GST_DEBUG_OBJECT(filter, "Remaining waveform size: %d", remaining_wave_part->Dim());
-  filter->total_time_decoded -= 1.0 * remaining_wave_part->Dim() / filter->sample_rate;
-
-  if (num_seconds_decoded > 0.1)
-  {
-    GST_DEBUG_OBJECT(filter, "Getting lattice..");
-    decoder.FinalizeDecoding();
-    CompactLattice clat;
-    bool end_of_utterance = true;
-    decoder.GetLattice(end_of_utterance, &clat, NULL);
-    GST_DEBUG_OBJECT(filter, "Lattice done");
-    if ((filter->lm_fst != NULL) && (filter->big_lm_const_arpa != NULL))
-    {
-      GST_DEBUG_OBJECT(filter, "Rescoring lattice with a big LM");
-      CompactLattice rescored_lat;
-      if (gst_kaldinnet2onlinedecoder_rescore_big_lm(filter, clat, rescored_lat))
-      {
-        clat = rescored_lat;
-      }
-    }
-
-    guint num_words = 0;
-    gst_kaldinnet2onlinedecoder_final_result(filter, clat, &num_words);
-    if (num_words >= filter->min_words_for_ivector)
-    {
-      // Only update adaptation state if the utterance contained enough words
-      decoder.GetAdaptationState(filter->adaptation_state);
-    }
-  }
-  else
-  {
-    GST_DEBUG_OBJECT(filter, "Less than 0.1 seconds decoded, discarding");
-  }
-}
-
 static void gst_kaldinnet2onlinedecoder_unthreaded_decode_segment(
     Gstkaldinnet2onlinedecoder *filter,
     bool &more_data,
@@ -1942,14 +1823,7 @@ static void gst_kaldinnet2onlinedecoder_loop(
   {
     if (filter->nnet_mode == NNET2)
     {
-      if (filter->use_threaded_decoder)
-      {
-        gst_kaldinnet2onlinedecoder_threaded_decode_segment(filter, more_data, chunk_length, traceback_period_secs, &remaining_wave_part);
-      }
-      else
-      {
-        gst_kaldinnet2onlinedecoder_unthreaded_decode_segment(filter, more_data, chunk_length, traceback_period_secs);
-      }
+      gst_kaldinnet2onlinedecoder_unthreaded_decode_segment(filter, more_data, chunk_length, traceback_period_secs);
     }
     else
     {
